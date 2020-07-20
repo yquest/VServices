@@ -1,0 +1,6 @@
+rootProject.name = 'VServices'
+include 'app'
+include 'server'
+include 'example-server'
+include 'example-route'
+include 'shared-web'

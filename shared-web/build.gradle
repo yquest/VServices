@@ -1,0 +1,11 @@
+plugins {
+    id 'java'
+}
+ext{
+    name4task = 'SharedWeb'
+}
+
+dependencies {
+    compileOnly "io.vertx:vertx-core:$vertxVersion"
+    compileOnly "io.vertx:vertx-web:$vertxVersion"
+}

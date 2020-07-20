@@ -1,0 +1,16 @@
+plugins {
+    id 'java'
+}
+
+dependencies {
+    compileOnly project(':shared-web')
+    compileOnly "io.vertx:vertx-lang-groovy:$vertxVersion"
+    compileOnly "io.vertx:vertx-codegen:$vertxVersion"
+    compileOnly "io.vertx:vertx-shell:$vertxVersion"
+    compileOnly 'ch.qos.logback:logback-core:1.2.3'
+    compileOnly 'ch.qos.logback:logback-classic:1.2.3'
+
+    testImplementation group: 'io.vertx', name: 'vertx-junit5', version: '3.8.5'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine'
+    testImplementation "org.junit.jupiter:junit-jupiter-api:$junitJupiterEngineVersion"
+}

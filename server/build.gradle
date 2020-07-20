@@ -1,0 +1,56 @@
+plugins {
+    id 'maven-publish'
+    id 'java'
+}
+
+java {
+    withSourcesJar()
+    withJavadocJar()
+}
+
+publishing {
+    repositories {
+        maven {
+            name = "GitHubPackages"
+            url = uri("https://maven.pkg.github.com/yquest/vertx-service-load")
+            credentials {
+                if (!rootProject.hasProperty('githubUser')) return
+                username = rootProject.property('githubUser')
+                password = rootProject.property('githubToken')
+            }
+        }
+    }
+    publications {
+        //noinspection GroovyAssignabilityCheck
+        maven(MavenPublication) {
+            //noinspection GroovyAssignabilityCheck
+            groupId = 'org.gradle.sample'
+            //noinspection GroovyAssignabilityCheck
+            artifactId = 'project1-sample'
+            //noinspection GroovyAssignabilityCheck
+            version = '1.1'
+            //noinspection GroovyAssignabilityCheck
+            from(components['java'])
+        }
+    }
+}
+
+dependencies {
+    compileOnly "io.vertx:vertx-codegen:$vertxVersion"
+    implementation 'com.google.dagger:dagger:2.28.1'
+    annotationProcessor 'com.google.dagger:dagger-compiler:2.28.1'
+
+    implementation "io.vertx:vertx-config:$vertxVersion"
+    implementation "io.vertx:vertx-config-yaml:$vertxVersion"
+    implementation "io.vertx:vertx-service-factory:$vertxVersion"
+    implementation "io.vertx:vertx-lang-groovy:$vertxVersion"
+    implementation "io.vertx:vertx-shell:$vertxVersion"
+    implementation 'ch.qos.logback:logback-core:1.2.3'
+    implementation 'ch.qos.logback:logback-classic:1.2.3'
+
+    testImplementation "io.vertx:vertx-web-client:$vertxVersion"
+    testImplementation group: 'org.mockito', name: 'mockito-core', version: '3.4.0'
+    testImplementation group: 'io.vertx', name: 'vertx-junit5', version: vertxVersion
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine'
+    testImplementation "org.junit.jupiter:junit-jupiter-api:$junitJupiterEngineVersion"
+}

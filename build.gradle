@@ -1,0 +1,191 @@
+import groovy.json.JsonBuilder
+import org.apache.tools.ant.filters.ReplaceTokens
+
+import java.util.stream.Collectors
+
+group 'org.example'
+version '1.0-SNAPSHOT'
+
+
+ext {
+    vertxVersion = '3.9.1'
+    junitJupiterEngineVersion = '5.6.2'
+    resourcesDir = "$rootDir/resources".toString()
+    resourcesBuildDir = mkdir("$resourcesDir/build")
+
+    app = [
+            args  : [
+                    'web'   : 8002,
+                    'telnet': 8003
+            ],
+            system: [
+                    'vertx.logger-delegate-factory-class-name': 'io.vertx.core.logging.SLF4JLogDelegateFactory',
+                    'PATH_TO_SAVE_SERVICES_MAP'               : 'temp/map.json',
+                    'logback.configurationFile'               : 'conf/logback.xml',
+                    'io.netty.tryReflectionSetAccessible'     : "true"
+            ]
+    ]
+
+    verticles = [
+            routeJava  : [
+                    main: 'pt.fabm.JavaRoute',
+                    dependencies: ['server'],
+                    project     : project(':example-route'),
+                    classpath   : 'jars'
+
+            ],
+            server     : [
+                    main        : 'pt.fabm.MainVerticleServer',
+                    dependencies: ['sharedWeb'],
+                    options     : [
+                            config: [port: 8081, host: 'localhost']
+                    ],
+                    project     : project(':example-server'),
+                    classpath   : 'jars'
+            ],
+            'sharedWeb': [
+                    main     : 'pt.fabm.DefaultSharedComponents',
+                    project  : project(':shared-web'),
+                    classpath: 'jars'
+            ]
+    ]
+}
+Project appProject = project('app')
+
+task('clean', group: 'build').doFirst({
+    delete resourcesBuildDir
+} as Action)
+
+private static Map<String, ?> getClasspathOptions(Map.Entry verticle) {
+    Map<String, ?> options = [
+            'isolationGroup': verticle.key,
+            'extraClasspath': verticle.value['project'].with { p ->
+                FileCollection files = p.jar.outputs.files + p.configurations.runtimeClasspath
+                files.collect { "verticles/${verticle.key}/${it.name}" }
+            }
+    ]
+    if (!(verticle.value as Map<String, ?>).containsKey('options')) {
+        return options
+    } else {
+        return verticle.value['options'] + options
+    }
+}
+
+List<String> verticlesTasks = []
+for (verticle in verticles) {
+
+    String name4task = verticle.key
+    //change first letter to uppercase
+    name4task = name4task[0].toUpperCase() + name4task[1..name4task.size() - 1]
+    name4task = "copy${name4task}Dependencies"
+    def currentProject = verticle.value['project']
+    def currentDir = verticle.key
+    tasks.register(name4task, Copy) {
+        group = 'copy'
+        from {
+            currentProject.with {
+                it.jar.outputs.files + it.configurations.runtimeClasspath
+            }
+        }
+        into "$resourcesBuildDir/app/verticles/$currentDir"
+    }
+    verticlesTasks += name4task.toString()
+}
+
+task copyVerticles(group: 'copy', dependsOn: verticlesTasks)
+
+task copyConf(type: Copy, group: 'copy') {
+    def outDir = "$resourcesBuildDir/app/conf"
+    from("$resourcesDir/conf")
+    into("$resourcesBuildDir/app/conf")
+    eachFile { file ->
+        if (file.name == 'conf.yaml')
+            file.filter {
+                it
+                        .replace('${web.port}', app.args.web.toString())
+                        .replace('${telnet.port}', app.args.telnet.toString())
+            }
+    }
+    doLast {
+        def map = verticles.collectEntries { root ->
+            def inner = root.value.findAll {
+                !['project', 'classpath'].contains(it.key)
+            }
+            if (root.value?.classpath == 'jars') {
+                inner.options = getClasspathOptions(root)
+            }
+            [root.key, inner]
+        }
+
+        file("$outDir/verticles.json").text = new JsonBuilder(map)
+                .toPrettyString()
+    }
+}
+
+task runApp(group: 'application') {
+    dependsOn = [copyVerticles]
+    description = 'launch app'
+    doLast {
+        ProcessBuilder processBuilder = new ProcessBuilder(['sh', 'app.sh'])
+        File outputFile = file("$resourcesBuildDir/out.log")
+        processBuilder.directory(file("$resourcesBuildDir/app"))
+        processBuilder.redirectOutput(outputFile)
+        processBuilder.redirectOutput()
+        processBuilder.start()
+    }
+}
+
+
+task installWithoutVerticles() {
+    dependsOn = ['']
+}
+
+
+task createScript(group: 'application') {
+    doLast {
+        List<String> libs = appProject.configurations.runtimeClasspath.files*.name \
+                                         + appProject.jar.outputs.files*.name as List<String>
+
+        def tokensMap = [
+                classReference: 'pt.fabm.Main conf/conf.yaml',
+                libs          : libs.stream().map { "libs/$it" }.collect(Collectors.joining(":")),
+                jvmArgs       : app.system
+                        .entrySet()
+                        .stream()
+                        .map { "-D${it.key}=${it.value}" }
+                        .collect(Collectors.joining(' '))
+        ]
+        copy {
+            from("$resourcesDir/app.tpl")
+            filter ReplaceTokens, tokens: tokensMap
+            rename '(.*)\\.tpl', '$1.sh'
+            into "${resourcesBuildDir}/app"
+        }
+
+    }
+}
+
+task createTmpDir(type: Copy) {
+    from "${resourcesDir}/temp"
+    into "${resourcesBuildDir}/app/temp"
+}
+
+task runAppSync(type: JavaExec, group: 'application', dependsOn: [':app:jar', createTmpDir, copyConf, copyVerticles]) {
+    description = 'launch app synchronously'
+
+    main = 'pt.fabm.Main'
+    args 'conf/conf.yaml'
+    classpath = files { appProject.sourceSets.main.runtimeClasspath }
+
+    app.system.forEach { String k, v -> systemProperty(k, v) }
+    workingDir file("$resourcesBuildDir/app")
+
+}
+
+
+subprojects {
+    repositories {
+        mavenLocal()
+        mavenCentral()
+    }
+}

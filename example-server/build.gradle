@@ -1,0 +1,18 @@
+plugins {
+    id 'java'
+}
+
+ext {
+    name4task = 'Server'
+}
+
+dependencies {
+    compileOnly project(':shared-web')
+    compileOnly "io.vertx:vertx-lang-groovy:$vertxVersion"
+    compileOnly "io.vertx:vertx-shell:$vertxVersion"
+    compileOnly "io.vertx:vertx-codegen:$vertxVersion"
+
+    testImplementation group: 'io.vertx', name: 'vertx-junit5', version: '3.8.5'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine'
+    testImplementation "org.junit.jupiter:junit-jupiter-api:$junitJupiterEngineVersion"
+}
