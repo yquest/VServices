@@ -64,7 +64,7 @@ public class RedeployServiceCLI implements AppAction {
         context
                 .getServicesDeployedJson()
                 .redeployJson(name)
-                .onSuccess(id -> rc.response().end(new JsonObject().put("id", id).toBuffer()))
+                .onSuccess(map -> rc.response().end(JsonObject.mapFrom(map).toBuffer()))
                 .onFailure(error -> AppAction.onError(LOGGER, rc, error));
     }
 

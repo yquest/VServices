@@ -3,7 +3,7 @@ import org.apache.tools.ant.filters.ReplaceTokens
 
 import java.util.stream.Collectors
 
-group 'org.example'
+group 'pt.yquest'
 version '1.0-SNAPSHOT'
 
 
@@ -122,24 +122,9 @@ task copyConf(type: Copy, group: 'copy') {
     }
 }
 
-task runApp(group: 'application') {
-    dependsOn = [copyVerticles]
-    description = 'launch app'
-    doLast {
-        ProcessBuilder processBuilder = new ProcessBuilder(['sh', 'app.sh'])
-        File outputFile = file("$resourcesBuildDir/out.log")
-        processBuilder.directory(file("$resourcesBuildDir/app"))
-        processBuilder.redirectOutput(outputFile)
-        processBuilder.redirectOutput()
-        processBuilder.start()
-    }
-}
-
-
 task installWithoutVerticles() {
     dependsOn = ['']
 }
-
 
 task createScript(group: 'application') {
     doLast {
@@ -182,10 +167,12 @@ task runAppSync(type: JavaExec, group: 'application', dependsOn: [':app:jar', cr
 
 }
 
-
 subprojects {
     repositories {
         mavenLocal()
         mavenCentral()
     }
 }
+
+def functionalTestTask = project('functional-tests').getTasksByName('test', false).first()
+functionalTestTask.dependsOn([copyConf, copyVerticles, createTmpDir])

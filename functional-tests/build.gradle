@@ -1,0 +1,50 @@
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+
+    dependencies {
+        classpath 'io.github.http-builder-ng:http-builder-ng-apache:1.0.3'
+    }
+}
+plugins {
+    id 'groovy'
+}
+repositories {
+    mavenCentral()
+}
+
+task generateServerScript() {
+    doLast {
+        def path = "${buildDir}/generated/src/test/groovy"
+        mkdir(path)
+        def file = file("$path/ServerScript.groovy")
+        StringBuilder sb = new StringBuilder()
+        sb << '''pt.fabm.Main.main('conf/conf.yaml')\n'''
+        sb << """static int getWebport(){ return ${app.args.web} }"""
+        file.text = sb.toString()
+    }
+}
+
+sourceSets {
+    test {
+        groovy.srcDir "${buildDir}/generated/src/test/groovy"
+    }
+}
+
+compileTestGroovy.dependsOn(generateServerScript)
+test {
+    useJUnitPlatform()
+    app.system.each { Map.Entry<String, String> entry ->
+        systemProperty(entry.key, entry.value)
+    }
+    workingDir(file("$resourcesBuildDir/app"))
+}
+
+dependencies {
+    testImplementation project(':app')
+    testImplementation group: 'commons-net', name: 'commons-net', version: '3.6'
+    testImplementation 'io.github.http-builder-ng:http-builder-ng-apache:1.0.3'
+    testImplementation 'org.spockframework:spock-core:2.0-M3-groovy-3.0'
+    testImplementation group: 'com.jcraft', name: 'jsch', version: '0.1.55'
+}
