@@ -27,15 +27,15 @@ ext {
     ]
 
     verticles = [
-            routeJava  : [
-                    main: 'pt.fabm.JavaRoute',
+            routeJava     : [
+                    main        : 'pt.yquest.JavaRoute',
                     dependencies: ['server'],
                     project     : project(':example-route'),
                     classpath   : 'jars'
 
             ],
-            server     : [
-                    main        : 'pt.fabm.MainVerticleServer',
+            server        : [
+                    main        : 'pt.yquest.MainVerticleServer',
                     dependencies: ['sharedWeb'],
                     options     : [
                             config: [port: 8081, host: 'localhost']
@@ -43,12 +43,26 @@ ext {
                     project     : project(':example-server'),
                     classpath   : 'jars'
             ],
-            'sharedWeb': [
-                    main     : 'pt.fabm.DefaultSharedComponents',
+            sharedWeb     : [
+                    main     : 'pt.yquest.DefaultSharedComponents',
                     project  : project(':shared-web'),
                     classpath: 'jars'
+            ],
+            groovyVerticle: [
+                    main        : 'groovy-example.groovy',
+                    classpath   : [src: 'src/main/resources/groovy-example.groovy'],
+                    project     : project(':groovy-script-example'),
+                    dependencies: ['server']
+            ],
+            groovyRoute   : [
+                    main          : 'groovy-router-example.groovy',
+                    'service-type': 'groovy-route-dsl',
+                    classpath     : [src: 'src/main/resources/groovy-router-example.groovy'],
+                    project       : project(':groovy-script-example'),
+                    dependencies  : ['server']
             ]
     ]
+    remoteTests = true
 }
 Project appProject = project('app')
 
@@ -78,16 +92,22 @@ for (verticle in verticles) {
     //change first letter to uppercase
     name4task = name4task[0].toUpperCase() + name4task[1..name4task.size() - 1]
     name4task = "copy${name4task}Dependencies"
-    def currentProject = verticle.value['project']
+    Project currentProject = verticle.value['project'] as Project
+    def classpath = verticle.value['classpath']
     def currentDir = verticle.key
     tasks.register(name4task, Copy) {
         group = 'copy'
-        from {
-            currentProject.with {
-                it.jar.outputs.files + it.configurations.runtimeClasspath
+        if (classpath == 'jars') {
+            from {
+                currentProject.with {
+                    it.jar.outputs.files + it.configurations.runtimeClasspath
+                }
             }
+            into "$resourcesBuildDir/app/verticles/$currentDir"
+        } else if (classpath instanceof Map && classpath.src != null) {
+            from { "${currentProject.projectDir}/${classpath.src}" }
+            into "$resourcesBuildDir/app/verticles/$currentDir"
         }
-        into "$resourcesBuildDir/app/verticles/$currentDir"
     }
     verticlesTasks += name4task.toString()
 }
@@ -113,6 +133,8 @@ task copyConf(type: Copy, group: 'copy') {
             }
             if (root.value?.classpath == 'jars') {
                 inner.options = getClasspathOptions(root)
+            } else if (root.value?.classpath instanceof Map && root.value?.classpath?.src != null) {
+                inner.main = "verticles/${root.key}/${root.value.main}"
             }
             [root.key, inner]
         }
@@ -122,17 +144,13 @@ task copyConf(type: Copy, group: 'copy') {
     }
 }
 
-task installWithoutVerticles() {
-    dependsOn = ['']
-}
-
 task createScript(group: 'application') {
     doLast {
         List<String> libs = appProject.configurations.runtimeClasspath.files*.name \
-                                         + appProject.jar.outputs.files*.name as List<String>
+                                                       + appProject.jar.outputs.files*.name as List<String>
 
         def tokensMap = [
-                classReference: 'pt.fabm.Main conf/conf.yaml',
+                classReference: 'pt.yquest.Main conf/conf.yaml',
                 libs          : libs.stream().map { "libs/$it" }.collect(Collectors.joining(":")),
                 jvmArgs       : app.system
                         .entrySet()
@@ -146,7 +164,6 @@ task createScript(group: 'application') {
             rename '(.*)\\.tpl', '$1.sh'
             into "${resourcesBuildDir}/app"
         }
-
     }
 }
 
@@ -158,7 +175,7 @@ task createTmpDir(type: Copy) {
 task runAppSync(type: JavaExec, group: 'application', dependsOn: [':app:jar', createTmpDir, copyConf, copyVerticles]) {
     description = 'launch app synchronously'
 
-    main = 'pt.fabm.Main'
+    main = 'pt.yquest.Main'
     args 'conf/conf.yaml'
     classpath = files { appProject.sourceSets.main.runtimeClasspath }
 
@@ -175,4 +192,6 @@ subprojects {
 }
 
 def functionalTestTask = project('functional-tests').getTasksByName('test', false).first()
-functionalTestTask.dependsOn([copyConf, copyVerticles, createTmpDir])
+if (!remoteTests) {
+    functionalTestTask.dependsOn([copyConf, copyVerticles, createTmpDir])
+}

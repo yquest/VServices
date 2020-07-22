@@ -20,7 +20,8 @@ task generateServerScript() {
         mkdir(path)
         def file = file("$path/ServerScript.groovy")
         StringBuilder sb = new StringBuilder()
-        sb << '''pt.fabm.Main.main('conf/conf.yaml')\n'''
+        if (!remoteTests)
+            sb << '''pt.yquest.Main.main('conf/conf.yaml')\n'''
         sb << """static int getWebport(){ return ${app.args.web} }"""
         file.text = sb.toString()
     }
@@ -35,10 +36,13 @@ sourceSets {
 compileTestGroovy.dependsOn(generateServerScript)
 test {
     useJUnitPlatform()
-    app.system.each { Map.Entry<String, String> entry ->
-        systemProperty(entry.key, entry.value)
+    if (!remoteTests) {
+        environment("that's","cool")
+        app.system.each { Map.Entry<String, String> entry ->
+            systemProperty(entry.key, entry.value)
+        }
+        workingDir(file("$resourcesBuildDir/app"))
     }
-    workingDir(file("$resourcesBuildDir/app"))
 }
 
 dependencies {

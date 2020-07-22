@@ -1,0 +1,14 @@
+plugins {
+    id 'java'
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    compileOnly project(':shared-web')
+    compileOnly "io.vertx:vertx-codegen:$vertxVersion"
+    compileOnly "io.vertx:vertx-lang-groovy:$vertxVersion"
+    compileOnly "io.vertx:vertx-shell:$vertxVersion"
+}
